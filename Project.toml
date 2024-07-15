@@ -1,0 +1,13 @@
+name = "HybridFMM"
+uuid = "0feb8916-a5ed-4680-aaf5-951eb43605b2"
+authors = ["djukic14 <danijel.jukic14@gmail.com> and contributors"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.6.7"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
