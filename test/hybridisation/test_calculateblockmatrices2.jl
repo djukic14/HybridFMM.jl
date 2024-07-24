@@ -6,6 +6,7 @@ using LinearAlgebra
 using H2FactoryTestUtils
 using iFMM
 using MLFMA
+using SphericalScattering
 
 BEASTnurbs = Base.get_extension(BEAST, :BEASTnurbs)
 H2NURBS = Base.get_extension(H2Factory, :H2NURBS)
@@ -16,11 +17,11 @@ k = 2π / λ
 
 operator = Maxwell3D.singlelayer(; wavenumber=k, alpha=1.0, beta=0.0)
 
-fns = [joinpath(pkgdir(iFMM), "test", "assets", "fichera.dat")]
+fns = [joinpath(pkgdir(iFMM), "test", "assets", "torus.dat")]
 m = readMultipatch(fns[1])
 
-p = 2
-N = 2^2 + p
+p = 1
+N = 2^3 + p
 X = BsplineBasisDiv(m, p, N)
 X = superspace(X; interfacesonly=false)
 
@@ -72,8 +73,8 @@ MLFMA.translationoperator!(
     translationoperator,
     im * k,
     MLFMA.cartesiansamplepoints(sampling)[1],
-    H2Trees.center(tree, testnode),
     H2Trees.center(tree, leaf),
+    H2Trees.center(tree, testnode),
     L,
 )
 translationoperator = translationoperator[:]
@@ -97,13 +98,13 @@ leafinterpolationpoints = pTranslator.evaluatedgeometry[H2Trees.patchID(tree, le
 ]
 
 leafJu = pTranslator.evaluatedgeometry[H2Trees.patchID(tree, leaf)][H2Trees.levelindex(tree, leaf) - 1][
-    1, 2
+    2, 1
 ][
     idsleafu, idsleafv
 ]
 
 leafJv = pTranslator.evaluatedgeometry[H2Trees.patchID(tree, leaf)][H2Trees.levelindex(tree, leaf) - 1][
-    2, 1
+    1, 2
 ][
     idsleafu, idsleafv
 ]
@@ -115,13 +116,13 @@ testinterpolationpoints = pTranslator.evaluatedgeometry[H2Trees.patchID(tree, te
 ]
 
 testJu = pTranslator.evaluatedgeometry[H2Trees.patchID(tree, testnode)][H2Trees.levelindex(tree, testnode) - 1][
-    2, 1
+    1, 2
 ][
     idstestnodeu, idstestnodev
 ]
 
 testJv = pTranslator.evaluatedgeometry[H2Trees.patchID(tree, testnode)][H2Trees.levelindex(tree, testnode) - 1][
-    1, 2
+    2, 1
 ][
     idstestnodeu, idstestnodev
 ]
@@ -129,6 +130,14 @@ testJv = pTranslator.evaluatedgeometry[H2Trees.patchID(tree, testnode)][H2Trees.
 leafconvertmatrix = [
     exp(
         -im *
+        k *
+        dot(leafinterpolationpoints[i] - H2Trees.center(tree, leaf), cartsamplingpoints[j]),
+    ) for j in eachindex(cartsamplingpoints), i in eachindex(leafinterpolationpoints)
+]
+
+leafconvertmatrix2 = [
+    exp(
+        im *
         k *
         dot(leafinterpolationpoints[i] - H2Trees.center(tree, leaf), cartsamplingpoints[j]),
     ) for j in eachindex(cartsamplingpoints), i in eachindex(leafinterpolationpoints)
@@ -161,9 +170,19 @@ leaffieldcollection[4] .= leafconvertmatrix * leafmomentcollection[3]
 testfieldcollection[4] .= testnodeconvertmatrix * testnodemomentcollection[3]
 
 for i in eachindex(leafinterpolationpoints)
+    Ju = leafJu[i]
+    Jv = leafJv[i]
+    # Ju = SphericalScattering.convertCartesian2Spherical(
+    #     leafJu[i], SphericalScattering.cart2sph(leafinterpolationpoints[i])
+    # )
+
+    # Jv = SphericalScattering.convertCartesian2Spherical(
+    #     leafJv[i], SphericalScattering.cart2sph(leafinterpolationpoints[i])
+    # )
+
     for j in eachindex(H2Trees.values(tree, leaf))
-        su = leafmomentcollection[1][i, j] * leafJu[i]
-        sv = leafmomentcollection[2][i, j] * leafJv[i]
+        su = leafmomentcollection[1][i, j] * Ju
+        sv = leafmomentcollection[2][i, j] * Jv
 
         for sindex in eachindex(su)
             leaffieldcollection[sindex][:, j] += su[sindex] .* leafconvertmatrix[:, i]
@@ -173,9 +192,27 @@ for i in eachindex(leafinterpolationpoints)
 end
 
 for i in eachindex(testinterpolationpoints)
+    Ju = testJu[i]
+    Jv = testJv[i]
+    # Ju = SphericalScattering.convertCartesian2Spherical(
+    #     testJu[i], SphericalScattering.cart2sph(testinterpolationpoints[i])
+    # )
+
+    # Jv = SphericalScattering.convertCartesian2Spherical(
+    #     testJv[i], SphericalScattering.cart2sph(testinterpolationpoints[i])
+    # )
+
     for j in eachindex(H2Trees.values(tree, testnode))
-        su = testnodemomentcollection[1][i, j] * testJu[i]
-        sv = testnodemomentcollection[2][i, j] * testJv[i]
+        # Ju = SphericalScattering.convertCartesian2Spherical(
+        #     testJu[i], SphericalScattering.cart2sph(cartsamplingpoints[i])
+        # )
+
+        # Jv = SphericalScattering.convertCartesian2Spherical(
+        #     testJv[i], SphericalScattering.cart2sph(cartsamplingpoints[i])
+        # )
+
+        su = testnodemomentcollection[1][i, j] * Jv
+        sv = testnodemomentcollection[2][i, j] * Ju
 
         for sindex in eachindex(su)
             testfieldcollection[sindex][:, j] += su[sindex] .* testnodeconvertmatrix[:, i]
@@ -186,24 +223,24 @@ end
 
 blockmatrix =
     operator.β *
-    transpose(testfieldcollection[4]) *
-    (translationoperator .* leaffieldcollection[4])
+    transpose(leaffieldcollection[4]) *
+    (translationoperator .* testfieldcollection[4])
 
 blockmatrix +=
     operator.α *
-    transpose(testfieldcollection[1]) *
-    (translationoperator .* leaffieldcollection[1])
+    transpose(leaffieldcollection[1]) *
+    (translationoperator .* testfieldcollection[1])
 
 blockmatrix +=
     operator.α *
-    transpose(testfieldcollection[2]) *
-    (translationoperator .* leaffieldcollection[2])
+    transpose(leaffieldcollection[2]) *
+    (translationoperator .* testfieldcollection[2])
 
 blockmatrix +=
     operator.α *
-    transpose(testfieldcollection[3]) *
-    (translationoperator .* leaffieldcollection[3])
+    transpose(leaffieldcollection[3]) *
+    (translationoperator .* testfieldcollection[3])
 
-er =
-    norm.(A[H2Trees.values(tree, leaf), H2Trees.values(tree, testnode)] - blockmatrix) ./
-    maximum(norm.(A[H2Trees.values(tree, leaf), H2Trees.values(tree, testnode)]))
+Ablock = A[H2Trees.values(tree, leaf), H2Trees.values(tree, testnode)]
+
+er = norm.(Ablock - blockmatrix) ./ maximum(norm.(Ablock))

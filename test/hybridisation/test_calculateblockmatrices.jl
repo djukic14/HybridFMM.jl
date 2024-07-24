@@ -16,8 +16,11 @@ k = 2π / λ
 
 operator = Maxwell3D.singlelayer(; wavenumber=k, alpha=0.0, beta=1.0)
 
-fns = [joinpath(pkgdir(iFMM), "test", "assets", "fichera.dat")]
-m = readMultipatch(fns[1])
+fnsstep = [joinpath(pkgdir(iFMM), "test", "assets", "Pyramid.stp")]
+m = readStep(fnsstep[1])
+
+# fns = [joinpath(pkgdir(iFMM), "test", "assets", "cube.dat")]
+# m = readMultipatch(fns[1])
 
 p = 2
 N = 2^2 + p
@@ -29,7 +32,7 @@ A = assemble(
 )
 
 tree = ParametricBoundingBallTree(X, 1 / N)
-polyp = 7
+polyp = 8
 polynomial = iFMM.BarycentricLagrangePolynomial2DChebyshev2(polyp)
 
 disaggregationplan = H2Trees.DisaggregationPlan(tree, H2Trees.TranslatingNodesIterator)
@@ -72,8 +75,8 @@ MLFMA.translationoperator!(
     translationoperator,
     im * k,
     MLFMA.cartesiansamplepoints(sampling)[1],
-    H2Trees.center(tree, testnode),
     H2Trees.center(tree, leaf),
+    H2Trees.center(tree, testnode),
     L,
 )
 translationoperator = translationoperator[:]
@@ -139,8 +142,10 @@ testnodeconvertmatrix = [
 
 b =
     operator.β *
-    transpose(testnodeconvertmatrix * testnodemomentcollection[3]) *
-    (translationoperator .* leafconvertmatrix * leafmomentcollection[3])
+    transpose(leafconvertmatrix * leafmomentcollection[3]) *
+    (translationoperator .* testnodeconvertmatrix * testnodemomentcollection[3])
+
+Ablock = A[H2Trees.values(tree, leaf), H2Trees.values(tree, testnode)]
 
 er =
     norm.(A[H2Trees.values(tree, leaf), H2Trees.values(tree, testnode)] - b) ./
