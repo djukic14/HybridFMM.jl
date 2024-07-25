@@ -28,12 +28,12 @@ polynomial = iFMM.BarycentricLagrangePolynomial2DChebyshev2(polyp)
 
 λ = tree.radius / 16
 k = 2π / λ
-operator = Maxwell3D.singlelayer(; wavenumber=k)#, alpha=1.0, beta=0.0)
+operator = iFMM.MWWeaklySingular3D(; wavenumber=k)
 
 hybridlevel = 6
 ishybrid = H2Trees.ishybridlevel(tree, hybridlevel)
 htree = HybridOcParametricBoundingBall(tree, λ, ishybrid)
-# @assert H2Trees.testwellseparatedness(htree)
+@assert H2Trees.testwellseparatedness(htree)
 
 A = assemble(
     operator, X, X; quadstrat=BEAST.DoubleNumWiltonSauterQStrat(7, 7, 7, 7, 1, 1, 1, 1)

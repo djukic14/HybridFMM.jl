@@ -1,3 +1,16 @@
+
+function cartesianfarfielddims(::BEAST.MWSingleLayer3D)
+    return 4
+end
+
+function cartesianfarfielddims(::iFMM.MWWeaklySingular3D)
+    return 3
+end
+
+function cartesianfarfielddims(::iFMM.MWHyperSingular3D)
+    return 1
+end
+
 function moments(γ, tree, relevantlevels, operator, polynomial, aggregationplan, samplings)
     return H2Trees.storagemomentsplan(
         aggregationplan,
@@ -23,7 +36,7 @@ function moment(γ::T, tree, relevantlevels, operator, polynomial, samplings) wh
         relevantlevels,
         polynomial,
         samplings,
-        Val{MLFMA.FarField{MLFMA.farfielddims(operator) + 1,Matrix{T}}}(),
+        Val{MLFMA.FarField{cartesianfarfielddims(operator),Matrix{T}}}(),
         Val{iFMM.PolynomialMoment{iFMM.dims(tmoment),Array{T,2}}}(),
     )
 end

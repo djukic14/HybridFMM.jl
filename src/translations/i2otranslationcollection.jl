@@ -42,16 +42,6 @@ function H2Factory.i2otranslation!(
     @cases out begin
         FarField(out) => @cases in begin
             FarField(in) => begin
-                # maxout = maximum(abs.(out[4]))
-                # maxin = maximum(abs.(in[4]))
-
-                # if maxout > 1e2
-                #     println("maxout farfield = $maxout")
-                # end
-
-                # if maxin > 1e2
-                #     println("maxin farfield = $maxin")
-                # end
                 H2Factory.i2otranslation!(out, in, receivingnode, translatingnode, tfs.uppertfs)
             end
 
@@ -64,17 +54,6 @@ function H2Factory.i2otranslation!(
                 "i2otranslation with $(typeof(out)) and $(typeof(in)) not allowed"
             )
             PolynomialMoment(in) => begin
-                # maxout = maximum(abs.(out[3]))
-                # maxin = maximum(abs.(in[3]))
-
-                # if maxout > 1e2
-                #     println("maxout poly= $maxout")
-                # end
-
-                # if maxin > 1e2
-                #     println("maxin poly= $maxin")
-                # end
-
                 H2Factory.i2otranslation!(out, in, receivingnode, translatingnode, tfs.lowertfs)
             end
         end

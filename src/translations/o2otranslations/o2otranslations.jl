@@ -66,7 +66,7 @@ function farfieldo2otranslation!(
                 storagemoment,
                 sampling(H2map, level - 1),
                 sampling(H2map, level);
-                interpolationtrait=Hybrid4InterpolationTrait(), #TODO: make this configurable
+                interpolationtrait=HybridFMM.defaultinterpolationtrait(parentmoment), #TODO: make this configurable
             )
         end
         PolynomialMoment(storagemoment) => error("Storagemoment is not a FarField")

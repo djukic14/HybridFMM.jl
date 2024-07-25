@@ -91,7 +91,7 @@ function farfieldi2itranslation!(
         childmoment,
         sampling(H2map, level),
         sampling(H2map, level - 1);
-        interpolationtrait=Hybrid4InterpolationTrait(), #TODO: make this configurable
+        interpolationtrait=HybridFMM.defaultinterpolationtrait(parentmoment), #TODO: make this configurable
     )
 
     MLFMA.shifttoparentphase!(parentmoment, i2itranslator.MLFMAphaseshifter, tree, child)
