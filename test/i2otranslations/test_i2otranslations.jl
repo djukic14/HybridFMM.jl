@@ -1,59 +1,98 @@
-using PlotlyJS
 using NURBS
 using BEAST
 using Test
 using H2Factory
 using LinearAlgebra
 using H2FactoryTestUtils
-using ClusterTrees
 using iFMM
 using MLFMA
+using SphericalScattering
+using HybridFMM
+using StaticArrays
 
 BEASTnurbs = Base.get_extension(BEAST, :BEASTnurbs)
-fns = [joinpath(pkgdir(H2Factory), "test", "assets", "step", "sphere.dat")]
+H2NURBS = Base.get_extension(H2Factory, :H2NURBS)
+iFMMNURBS = Base.get_extension(iFMM, :iFMMNURBS)
 
-λ = 1.0
-k = 2π / λ
-γ = k * im
+@testset "Hybrid parametric i2otranslations" begin
+    fns = [joinpath(pkgdir(iFMM), "test", "assets", "sphere.dat")]
+    m = readMultipatch(fns[1])
 
-polynomial = iFMM.BarycentricLagrangePolynomial2DChebyshev2(4)
+    p = 1
+    N = 2^3 + p
+    X = BsplineBasisDiv(m, p, N)
+    X = superspace(X; interfacesonly=false)
 
-op = Maxwell3D.singlelayer(; wavenumber=k)
+    originaltree = ParametricBoundingBallTree(X, 1 / N)
 
-m = readMultipatch(fns[1])
-p = 1
-N = 2^3 + p
-X = BsplineBasisDiv(m, p, N)
-X = superspace(X)
-tree = ParametricBoundingBallTree(X, 1 / N)
+    polyp = 4
+    polynomial = iFMM.BarycentricLagrangePolynomial2DEquidistant(polyp)
 
-hybridlevel = 4
+    λ = originaltree.radius / 1
+    k = 2π / λ
+    operator = iFMM.MWHyperSingular3D(; wavenumber=k)
 
-ishybrid = H2Trees.ishybridlevel(tree, hybridlevel)
+    # hybridlevel = 6
+    # ishybrid = H2Trees.ishybridlevel(originaltree, hybridlevel)
+    hybridsize = originaltree.radius / 7
+    ishybrid = H2Trees.ishybridradius(originaltree, hybridsize)
+    htree = HybridOcParametricBoundingBall(originaltree, λ / 1.5, ishybrid)
 
-htree = H2Factory.HybridOcParametricBoundingBall(tree, tree.radius / 8, ishybrid)
-lowertree = htree.lowertree
-uppertree = htree.uppertree
+    buffertest = Vector{eltype(polynomial)}(undef, 2)
+    buffertrial = Vector{eltype(polynomial)}(undef, 2)
 
-disaggregationplan = H2Trees.DisaggregationPlan(htree, H2Trees.TranslatingNodesIterator)
+    disaggregationplan = H2Trees.DisaggregationPlan(htree, H2Trees.TranslatingNodesIterator)
+    tfs = iFMM.I2OTranslationCollection(
+        operator, htree.lowertree, polynomial, disaggregationplan, X
+    )
 
-up, low = H2Trees.DisaggregationPlan(htree, disaggregationplan)
+    for receivingnode in H2Trees.disaggregationnodes(disaggregationplan)
+        # !H2Trees.isleaf(htree, receivingnode) && continue
 
-@test sort(disaggregationplan.disaggregationnodes) ==
-    sort(vcat(up.disaggregationnodes, low.disaggregationnodes))
+        preceivingnode = H2Trees.parametricnode(htree, receivingnode)
 
-tfsamplings = [
-    MLFMA.SphericalSampling{Float64}(8, 16), MLFMA.SphericalSampling{Float64}(4, 8)
-]
+        receivingpolynomial = iFMM.shiftedpolynomial(
+            htree.lowertree.parametrictree, polynomial, preceivingnode
+        )
 
-tfs = MLFMA.TranslationCollection(1.0 * im, htree.uppertree, up, tfsamplings)
+        TestLinearIndices = collect(LinearIndices(receivingpolynomial))
 
-itfs = iFMM.I2OTranslationCollection(op, htree.lowertree, polynomial, low, X);
+        patch = X.geo[H2Trees.patchID(htree, receivingnode)]
+        testpoints = SVector{3,Float64}[]
 
-olditfs = iFMM.I2OTranslationCollection(
-    op,
-    tree,
-    polynomial,
-    H2Trees.DisaggregationPlan(tree, H2Trees.TranslatingNodesIterator),
-    X,
-);
+        for j in TestLinearIndices
+            iFMM.getsamplingpoint!(buffertest, receivingpolynomial, j)
+            push!(testpoints, patch([buffertest[1]], [buffertest[2]])[1])
+        end
+
+        for translatingnode in H2Trees.translatingnodes(disaggregationplan, receivingnode)
+            ptranslatingnode = H2Trees.parametricnode(htree, translatingnode)
+            translatingpolynomial = iFMM.shiftedpolynomial(
+                htree.lowertree.parametrictree, polynomial, ptranslatingnode
+            )
+            patch = X.geo[H2Trees.patchID(htree, translatingnode)]
+
+            TrialLinearIndices = collect(LinearIndices(translatingpolynomial))
+
+            trialpoints = SVector{3,Float64}[]
+            for j in TrialLinearIndices
+                iFMM.getsamplingpoint!(buffertrial, translatingpolynomial, j)
+                push!(trialpoints, patch([buffertrial[1]], [buffertrial[2]])[1])
+            end
+
+            tfgreen = tfs[(receivingnode, translatingnode)]
+
+            tfmatrix = zeros(ComplexF64, size(tfgreen))
+            for j in TrialLinearIndices
+                for i in TestLinearIndices
+                    tfmatrix[i, j] = iFMM.scalargreen3Dkernel(
+                        operator, testpoints[i], trialpoints[j]
+                    )
+                end
+            end
+
+            @test tfmatrix ≈ tfgreen
+            # println(receivingnode, " ", translatingnode)
+        end
+    end
+end

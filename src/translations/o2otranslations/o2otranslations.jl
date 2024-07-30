@@ -98,9 +98,9 @@ function polynomialo2otranslation!(
     child,
     o2otranslatorfunctor,
 )
-    o2otranslator = o2otranslatorfunctor.H2map.o2otranslator
+    o2otranslator = o2otranslatorfunctor.H2map.o2otranslator.iFMMo2otranslator
 
-    o2otranslator.iFMMo2otranslator(parentmoment, childmoment, tree, parent, child)
+    o2otranslator(parentmoment, childmoment, tree, parent, child)
 
     return nothing
 end

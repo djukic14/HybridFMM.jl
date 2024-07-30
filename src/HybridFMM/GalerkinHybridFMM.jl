@@ -48,7 +48,9 @@ function GalerkinHybridFMM(
     tree;
     ϵ=1e-4,
     polynomial=nothing,
-    nearinteractionsquadstrategy=iFMM.NEARINTERACTIONSQUADSTRATEGYRECOM,
+    nearinteractionsquadstrategy=quadstrat = BEAST.DoubleNumWiltonSauterQStrat(
+        7, 7, 7, 7, 1, 1, 1, 1
+    ),
     momentquadstrategy=iFMM.MOMENTSQUADSTRATEGYRECOM,
     verbose=false,
     NearInteractionsAssembler=iFMM.NEARINTERACTIONSASSEMBLERRECOM,
@@ -71,9 +73,7 @@ function GalerkinHybridFMM(
     nearassembler = NearInteractionsAssembler{typeof(γ)}(
         operator, space, space, nearinteractionsquadstrategy
     )
-    nearinteractions = nearassembler(
-        tree.lowertree, isnear(tree.lowertree); verbose=verbose
-    )
+    nearinteractions = nearassembler(tree, isnear(tree); verbose=verbose)
 
     verbose && @info "Assembling moments"
 
@@ -89,7 +89,7 @@ function GalerkinHybridFMM(
 
     leafpolynomials = iFMM.leafpolynomials(tree.lowertree, polynomial)
     momentcollections = Dictionary(
-        H2Trees.leaves(tree.lowertree),
+        H2Trees.leaves(tree),
         iFMM.TrialMomentCollections(
             operator,
             tree.lowertree,
@@ -98,6 +98,7 @@ function GalerkinHybridFMM(
             quadstrat=momentquadstrategy,
             MomentAssembler=MomentAssembler,
             verbose=verbose,
+            leaves=H2Trees.leaves(tree),
         ),
     )
 

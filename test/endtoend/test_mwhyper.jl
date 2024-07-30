@@ -28,32 +28,41 @@ polynomial = iFMM.BarycentricLagrangePolynomial2DChebyshev2(polyp)
 
 λ = tree.radius / 16
 k = 2π / λ
-operator = iFMM.MWHyperSingular3D(; wavenumber=k)
+# operator = iFMM.MWHyperSingular3D(; wavenumber=k)
+operator = Maxwell3D.singlelayer(; wavenumber=k)
 
-hybridlevel = 6
-ishybrid = H2Trees.ishybridlevel(tree, hybridlevel)
-htree = HybridOcParametricBoundingBall(tree, λ, ishybrid)
-# @assert H2Trees.testwellseparatedness(htree)
+# hybridlevel = 6
+# ishybrid = H2Trees.ishybridlevel(tree, hybridlevel)
+hybridsize = λ / 4
+ishybrid = H2Trees.ishybridradius(tree, hybridsize)
+htree = HybridOcParametricBoundingBall(tree, 2 * λ, ishybrid)
+@assert H2Trees.testwellseparatedness(htree)
 
 A = assemble(
     operator, X, X; quadstrat=BEAST.DoubleNumWiltonSauterQStrat(7, 7, 7, 7, 1, 1, 1, 1)
 )
 
-Ahybrid = HybridFMM.assemble(
-    operator,
-    X,
-    htree;
-    polynomial=polynomial,
-    NearInteractionsAssembler=H2Factory.DummyNearInteractionsAssembler,
-);
+# Ahybrid = HybridFMM.assemble(
+#     operator,
+#     X,
+#     htree;
+#     polynomial=polynomial,
+#     NearInteractionsAssembler=H2Factory.DummyNearInteractionsAssembler,
+# );
+
+Ahybrid = MLFMA.assemble(
+    operator, X; NearInteractionsAssembler=H2Factory.DummyNearInteractionsAssembler
+)
 
 Afar = farinteractions(A, Ahybrid)
 
 x = randn(ComplexF64, numfunctions(X))
+# x = zeros(ComplexF64, numfunctions(X))
+# x[1] = 1
 
 y = Ahybrid * x;
 yA = Afar * x;
 
-error = norm.(yA - y) / maximum(norm.(yA))
+er = norm.(yA - y) / maximum(norm.(yA))
 
-maximum(error)
+@show maximum(er)

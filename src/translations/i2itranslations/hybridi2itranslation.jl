@@ -19,15 +19,16 @@ function HybridI2ITranslator(γ, ptranslator, tree, sampling::MLFMA.AbstractSamp
 
     hnodes = collect(values(H2Trees.hybridnodes(tree)))
 
+    ptree = tree.lowertree.parametrictree
+
     for (i, node) in enumerate(hnodes)
         parent = H2Trees.parent(tree, node)
-        evaluatedgeometry = ptranslator.evaluatedgeometry[H2Trees.patchID(tree, node)][H2Trees.levelindex(tree.lowertree, node) - 1]
 
-        idsu, idsv = iFMMNURBS._indicesranges(
-            H2Trees.parametrictree(tree.lowertree),
-            ptranslator.originalpolynomial,
-            H2Trees.parametricnode(tree, node),
-        )
+        pnode = H2Trees.parametricnode(tree.lowertree, node)
+        levelindex = H2Trees.levelindex(ptree, pnode)
+        evaluatedgeometry = ptranslator.evaluatedgeometry[H2Trees.patchID(tree, node)][levelindex]
+
+        idsu, idsv = iFMMNURBS._indicesranges(ptree, ptranslator.originalpolynomial, pnode)
 
         interpolationpoints = evaluatedgeometry[1, 1][idsu, idsv]
 
