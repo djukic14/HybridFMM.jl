@@ -6,6 +6,7 @@ struct GalerkinHybridFMM{
     SpaceType,
     MomentCollectionDictType,
     MomentsVectorType,
+    TestMomentsVectorType,
     StorageMomentsVectorType,
     I2ITranslatorType,
     I2OTranslatorType,
@@ -15,6 +16,7 @@ struct GalerkinHybridFMM{
     DisaggregationPlanType,
     ISNEAR,
     αType,
+    ThreadingType,
 } <: GalerkinH2Map{T}
     γ::T
     operator::OperatorType
@@ -23,6 +25,7 @@ struct GalerkinHybridFMM{
     space::SpaceType
     momentcollections::MomentCollectionDictType
     moments::MomentsVectorType
+    testmoments::TestMomentsVectorType
     incomingmoments::StorageMomentsVectorType
     storagemoments::StorageMomentsVectorType
     collectedmoments::StorageMomentsVectorType
@@ -36,6 +39,7 @@ struct GalerkinHybridFMM{
     verbose::Bool
     isnear::ISNEAR
     α::αType
+    threading::ThreadingType
 end
 
 function assemble(operator, space, tree; kwargs...)
@@ -64,6 +68,7 @@ function GalerkinHybridFMM(
     isnear=H2Trees.isnear(),
     translatingnodesiterator=iFMM.TRANSLATINGNODESRECOM(; isnear=isnear),
     aggregatenode=iFMM.AGGREGATENODES(; TranslatingNodesIterator=translatingnodesiterator),
+    threading=Val{:single}(),
 )
     @assert H2Trees.numberoflevels(tree) > 1
     @assert iFMM.trialmoment(operator, polynomial) == iFMM.testmoment(operator, polynomial)
@@ -77,7 +82,9 @@ function GalerkinHybridFMM(
 
     verbose && @info "Assembling moments"
 
-    galerkinplans = H2Trees.galerkinplans(tree, aggregatenode, translatingnodesiterator)
+    galerkinplans = H2Trees.galerkinplans(
+        tree, aggregatenode, translatingnodesiterator; threading=threading
+    )
     aggregationplan = galerkinplans.aggregationplan
     disaggregationplan = galerkinplans.disaggregationplan
     upperdisaggregationplan, lowerdisaggregationplan = H2Trees.DisaggregationPlan(
@@ -122,6 +129,7 @@ function GalerkinHybridFMM(
         upperdisaggregationplan=upperdisaggregationplan,
         lowerdisaggregationplan=lowerdisaggregationplan,
         translator=ptranslator,
+        threading=threading,
     )
 
     i2itranslator = I2ITranslator(
@@ -139,11 +147,25 @@ function GalerkinHybridFMM(
     o2otranslator = O2OTranslator(i2itranslator)
 
     moments = HybridFMM.moments(
-        γ, tree, relevantlevels, operator, polynomial, aggregationplan, samplings
+        complex(γ), tree, relevantlevels, operator, polynomial, aggregationplan, samplings
     )
 
+    testmoments = if threading == Val{:multi}()
+        HybridFMM.moments(
+            complex(γ),
+            tree,
+            relevantlevels,
+            operator,
+            polynomial,
+            aggregationplan,
+            samplings,
+        )
+    else
+        nothing
+    end
+
     storagemoments = HybridFMM.storagemoments(
-        γ, tree, relevantlevels, operator, polynomial, samplings
+        γ, tree, relevantlevels, operator, polynomial, samplings; threading=threading
     )
     incomingmoments = deepcopy(storagemoments)
     collectedmoments = deepcopy(storagemoments)
@@ -156,6 +178,7 @@ function GalerkinHybridFMM(
         space,
         momentcollections,
         moments,
+        testmoments,
         incomingmoments,
         storagemoments,
         collectedmoments,
@@ -169,6 +192,7 @@ function GalerkinHybridFMM(
         verbose,
         isnear(tree),
         iFMM.α(operator, polynomial),
+        threading,
     )
 end
 
@@ -178,4 +202,13 @@ end
 
 function sampling(A::GalerkinHybridFMM, level::Int)
     return A.samplings[levelindex(A, level)]
+end
+
+function H2Factory.testmoments(A::GalerkinHybridFMM)
+    @assert H2Factory.threading(A) == Val{:multi}()
+    return A.testmoments
+end
+
+function H2Factory.trialmoments(A::GalerkinHybridFMM)
+    return A.moments
 end

@@ -13,9 +13,10 @@ function I2OTranslationCollection(
     upperdisaggregationplan=nothing,
     lowerdisaggregationplan=nothing,
     translator=nothing,
+    threading,
 )
     up, low = if isnothing(upperdisaggregationplan) || isnothing(lowerdisaggregationplan)
-        H2Trees.DisaggregationPlan(tree, disaggregationplan)
+        H2Trees.DisaggregationPlan(tree, disaggregationplan; threading=threading)
     else
         upperdisaggregationplan, lowerdisaggregationplan
     end
@@ -29,6 +30,7 @@ function I2OTranslationCollection(
         translationsamplings;
         levelscales=MLFMA.getweights(translationsamplings),
     )
+
     lowertfs = iFMM.I2OTranslationCollection(
         operator, tree.lowertree, polynomial, low, X; translator=translator
     )
@@ -55,6 +57,42 @@ function H2Factory.i2otranslation!(
             )
             PolynomialMoment(in) => begin
                 H2Factory.i2otranslation!(out, in, receivingnode, translatingnode, tfs.lowertfs)
+            end
+        end
+    end
+
+    return out
+end
+
+function H2Factory.i2otranslation!(
+    out::MO,
+    in::MI,
+    receivingnode::Int,
+    translatingnode::Int,
+    tfs::I2OTranslationCollection,
+    α::Bool,
+    β::Bool,
+) where {MO<:HybridMoment,MI<:HybridMoment}
+    @cases out begin
+        FarField(out) => @cases in begin
+            FarField(in) => begin
+                H2Factory.i2otranslation!(
+                    out, in, receivingnode, translatingnode, tfs.uppertfs, α, β
+                )
+            end
+
+            PolynomialMoment(in) => error(
+                "i2otranslation with $(typeof(out)) and $(typeof(in)) not allowed"
+            )
+        end
+        PolynomialMoment(out) => @cases in begin
+            FarField(in) => error(
+                "i2otranslation with $(typeof(out)) and $(typeof(in)) not allowed"
+            )
+            PolynomialMoment(in) => begin
+                H2Factory.i2otranslation!(
+                    out, in, receivingnode, translatingnode, tfs.lowertfs, α, β
+                )
             end
         end
     end

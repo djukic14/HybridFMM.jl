@@ -15,10 +15,6 @@ end
 function (hybridtranslator::HybridO2OTranslator)(
     parentmoment::P, childmoment::F, tree, parent::Int, child::Int
 ) where {P<:H2Factory.AbstractMoment{3},F<:H2Factory.AbstractMoment{4}}
-    for i in eachindex(childmoment)
-        conj!(childmoment[i])
-    end
-
     for i in eachindex(parentmoment)
         parentmoment[i] .= zero(eltype(parentmoment[i]))
     end
@@ -42,23 +38,15 @@ function (hybridtranslator::HybridO2OTranslator)(
         childmomenty = view(childmoment[2], :)
         childmomentz = view(childmoment[3], :)
 
-        x = _elementwise_mul_sum(childmomentx, convertmatrix)
-        y = _elementwise_mul_sum(childmomenty, convertmatrix)
-        z = _elementwise_mul_sum(childmomentz, convertmatrix)
+        x = _elementwise_mul_sum_conj(childmomentx, convertmatrix)
+        y = _elementwise_mul_sum_conj(childmomenty, convertmatrix)
+        z = _elementwise_mul_sum_conj(childmomentz, convertmatrix)
 
         u = Jus[i][1] * x + Jus[i][2] * y + Jus[i][3] * z
         v = Jvs[i][1] * x + Jvs[i][2] * y + Jvs[i][3] * z
 
-        parentmoment[1][i] = u
-        parentmoment[2][i] = v
-    end
-
-    for i in eachindex(parentmoment)
-        conj!(parentmoment[i])
-    end
-
-    for i in eachindex(childmoment)
-        conj!(childmoment[i])
+        parentmoment[1][i] = conj(u)
+        parentmoment[2][i] = conj(v)
     end
 
     return parentmoment
@@ -78,10 +66,6 @@ end
 function (hybridtranslator::HybridO2OTranslator)(
     parentmoment::P, childmoment::F, tree, parent::Int, child::Int
 ) where {P<:H2Factory.AbstractMoment{2},F<:H2Factory.AbstractMoment{3}}
-    for i in eachindex(childmoment)
-        conj!(childmoment[i])
-    end
-
     for i in eachindex(parentmoment)
         parentmoment[i] .= zero(eltype(parentmoment[i]))
     end
@@ -99,32 +83,24 @@ function (hybridtranslator::HybridO2OTranslator)(
         childmomenty = view(childmoment[2], :)
         childmomentz = view(childmoment[3], :)
 
-        x = _elementwise_mul_sum(childmomentx, convertmatrix)
-        y = _elementwise_mul_sum(childmomenty, convertmatrix)
-        z = _elementwise_mul_sum(childmomentz, convertmatrix)
+        x = _elementwise_mul_sum_conj(childmomentx, convertmatrix)
+        y = _elementwise_mul_sum_conj(childmomenty, convertmatrix)
+        z = _elementwise_mul_sum_conj(childmomentz, convertmatrix)
 
         u = Jus[i][1] * x + Jus[i][2] * y + Jus[i][3] * z
         v = Jvs[i][1] * x + Jvs[i][2] * y + Jvs[i][3] * z
 
-        parentmoment[1][i] = u
-        parentmoment[2][i] = v
-    end
-
-    for i in eachindex(parentmoment)
-        conj!(parentmoment[i])
-    end
-
-    for i in eachindex(childmoment)
-        conj!(childmoment[i])
+        parentmoment[1][i] = conj(u)
+        parentmoment[2][i] = conj(v)
     end
 
     return parentmoment
 end
 
-function _elementwise_mul_sum(a, b)
+function _elementwise_mul_sum_conj(a, b)
     result = zero(eltype(a))
     for i in eachindex(a)
-        result += a[i] * b[i]
+        result += conj(a[i]) * b[i]
     end
     return result
 end

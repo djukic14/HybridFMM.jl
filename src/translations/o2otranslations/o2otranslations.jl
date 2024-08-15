@@ -37,6 +37,18 @@ function (o2otranslatorfunctor::O2OTranslatorFunctor{<:GalerkinHybridFMM})(
     return parentmoment
 end
 
+function o2ostoragemoment(H2map, level)
+    return o2ostoragemoment(H2map, level, H2Factory.threading(H2map))
+end
+
+function o2ostoragemoment(H2map, level, ::Val{:single})
+    return H2Factory.storagemoment(H2map, level - 1)
+end
+
+function o2ostoragemoment(H2map, level, ::Val{:multi})
+    return H2Factory.storagemoment(H2map, level - 1)[Threads.threadid()]
+end
+
 function farfieldo2otranslation!(
     parentmoment::MLFMA.FarField,
     childmoment::MLFMA.FarField,
@@ -49,7 +61,7 @@ function farfieldo2otranslation!(
     H2map = o2otranslatorfunctor.H2map
     level = H2Trees.level(tree, child)
 
-    storagemoment = H2Factory.storagemoment(H2map, level - 1)
+    storagemoment = o2ostoragemoment(H2map, level)
 
     @cases storagemoment begin
         FarField(storagemoment) => begin

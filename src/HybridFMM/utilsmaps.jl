@@ -19,11 +19,14 @@ function moments(γ, tree, relevantlevels, operator, polynomial, aggregationplan
     )
 end
 
-function storagemoments(γ, tree, relevantlevels, operator, polynomial, samplings)
+function storagemoments(
+    γ, tree, relevantlevels, operator, polynomial, samplings; threading=Val{:single}()
+)
     return H2Trees.storagemoments(
         relevantlevels,
         tree,
-        moment(γ, tree, relevantlevels, operator, polynomial, samplings),
+        moment(γ, tree, relevantlevels, operator, polynomial, samplings);
+        threading=threading,
     )
 end
 
@@ -37,7 +40,7 @@ function moment(γ::T, tree, relevantlevels, operator, polynomial, samplings) wh
         polynomial,
         samplings,
         Val{MLFMA.FarField{cartesianfarfielddims(operator),Matrix{T}}}(),
-        Val{iFMM.PolynomialMoment{iFMM.dims(tmoment),Array{T,2}}}(),
+        Val{iFMM.PolynomialMoment{iFMM.dims(tmoment),Array{T,1}}}(),
     )
 end
 
@@ -53,7 +56,9 @@ function moment(
             )
         else
             a = HybridMoment'.PolynomialMoment(
-                iFMM.PolynomialMoment{DP,eltype(MP)}(size(LinearIndices(polynomial)))
+                iFMM.PolynomialMoment{DP,eltype(MP)}((
+                    prod(size(LinearIndices(polynomial))),
+                )),
             )
 
             return a
