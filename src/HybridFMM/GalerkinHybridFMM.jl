@@ -70,6 +70,8 @@ function GalerkinHybridFMM(
     aggregatenode=iFMM.AGGREGATENODES(; TranslatingNodesIterator=translatingnodesiterator),
     threading=Val{:single}(),
 )
+    leafnodes = collect(Int, H2Trees.leaves(tree))
+
     @assert H2Trees.numberoflevels(tree) > 1
     @assert iFMM.trialmoment(operator, polynomial) == iFMM.testmoment(operator, polynomial)
     γ = BEAST.gamma(operator)
@@ -96,7 +98,7 @@ function GalerkinHybridFMM(
 
     leafpolynomials = iFMM.leafpolynomials(tree.lowertree, polynomial)
     momentcollections = Dictionary(
-        H2Trees.leaves(tree),
+        leafnodes,
         iFMM.TrialMomentCollections(
             operator,
             tree.lowertree,
@@ -105,7 +107,7 @@ function GalerkinHybridFMM(
             quadstrat=momentquadstrategy,
             MomentAssembler=MomentAssembler,
             verbose=verbose,
-            leaves=H2Trees.leaves(tree),
+            leaves=leafnodes,
         ),
     )
 
@@ -115,6 +117,8 @@ function GalerkinHybridFMM(
         γ, ϵ, tree.uppertree, relevantoctreelevels, samplingfunction
     )
     translationsamplings = samplings[(H2Trees.mintranslationlevel(disaggregationplan) - relevantlevels[begin] + 1):end]
+
+    verbose && @info "Assembling translators"
 
     ptranslator = iFMMNURBS.ParametriciFMMTranslator(
         operator, polynomial, tree.lowertree, lowerdisaggregationplan, space
@@ -145,6 +149,8 @@ function GalerkinHybridFMM(
     )
 
     o2otranslator = O2OTranslator(i2itranslator)
+
+    verbose && @info "Allocating storage for matrix vector product"
 
     moments = HybridFMM.moments(
         complex(γ), tree, relevantlevels, operator, polynomial, aggregationplan, samplings

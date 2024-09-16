@@ -21,7 +21,7 @@ function (hybridtranslator::HybridO2OTranslator)(
 
     LinearAlgebra.mul!(
         reshape(parentmoment[3], :),
-        transpose(hybridtranslator.convertmatrices[child]),
+        adjoint(hybridtranslator.convertmatrices[child]),
         reshape(childmoment[4], :),
     )
 
